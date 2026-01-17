@@ -3,7 +3,8 @@ import { getAuth } from 'firebase/auth';
 import { getDatabase } from 'firebase/database';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBpZXKoC0JVsZA0w9mohUIMCABRbHUEpxE",
+  apiKey: process.env.REACT_APP_FIREBASE_API_KEY,
+
   authDomain: "rushlimit-fb7be.firebaseapp.com",
   databaseURL: "https://rushlimit-fb7be-default-rtdb.asia-southeast1.firebasedatabase.app",
   projectId: "rushlimit-fb7be",

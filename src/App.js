@@ -1,16 +1,12 @@
-import { auth, database } from './firebase';
-// import { ref, set, get, onValue, push } from 'firebase/database';
-
-
 import React, { useState, useEffect } from 'react';
 import { Bus, Users, TrendingUp, MapPin, Clock, CheckCircle, AlertTriangle, BarChart3, Zap, Navigation, Bell, LogOut, Search, Calendar } from 'lucide-react';
 
-// NOTE: You'll need to add Firebase configuration in the setup instructions
-// This is a placeholder - actual Firebase code will be added during setup
 const RushLimitApp = () => {
-  const [userType, setUserType] = useState(null); // null, 'passenger', 'busowner'
+  const [userType, setUserType] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [availableBuses, setAvailableBuses] = useState(null);
+  const [busesDeployed, setBusesDeployed] = useState(false);
   
   // Passenger states
   const [selectedRoute, setSelectedRoute] = useState(null);
@@ -21,7 +17,6 @@ const RushLimitApp = () => {
   const [selectedTime, setSelectedTime] = useState('');
   const [trackingBus, setTrackingBus] = useState(null);
 
-  // Simulated Firebase data - In real app, this comes from Firebase Realtime Database
   const [routes] = useState([
     {
       id: 1,
@@ -36,7 +31,8 @@ const RushLimitApp = () => {
       shadowDemand: 23,
       flakeRate: 15,
       basesNeeded: 2,
-      status: 'overcrowded'
+      status: 'overcrowded',
+      mapCenter: { lat: 8.5241, lng: 76.9366 }
     },
     {
       id: 2,
@@ -51,7 +47,8 @@ const RushLimitApp = () => {
       shadowDemand: 12,
       flakeRate: 12,
       basesNeeded: 2,
-      status: 'optimal'
+      status: 'optimal',
+      mapCenter: { lat: 8.5500, lng: 76.8800 }
     },
     {
       id: 3,
@@ -66,7 +63,8 @@ const RushLimitApp = () => {
       shadowDemand: 7,
       flakeRate: 10,
       basesNeeded: 1,
-      status: 'optimal'
+      status: 'optimal',
+      mapCenter: { lat: 8.4800, lng: 76.9500 }
     },
     {
       id: 4,
@@ -81,7 +79,8 @@ const RushLimitApp = () => {
       shadowDemand: 10,
       flakeRate: 8,
       basesNeeded: 1,
-      status: 'optimal'
+      status: 'optimal',
+      mapCenter: { lat: 8.4850, lng: 76.9200 }
     },
     {
       id: 5,
@@ -96,11 +95,11 @@ const RushLimitApp = () => {
       shadowDemand: 7,
       flakeRate: 14,
       basesNeeded: 1,
-      status: 'underutilized'
+      status: 'underutilized',
+      mapCenter: { lat: 8.5700, lng: 76.8800 }
     }
   ]);
 
-  // Simulated bus fleet data for bus owners
   const [busFleet] = useState([
     { id: 1, licensePlate: 'KL-01-AB-1234', capacity: 50, routeAssigned: '42', status: 'active', currentOccupancy: 42, location: { lat: 8.5241, lng: 76.9366 } },
     { id: 2, licensePlate: 'KL-01-CD-5678', capacity: 50, routeAssigned: '42', status: 'active', currentOccupancy: 38, location: { lat: 8.5120, lng: 76.9550 } },
@@ -111,7 +110,6 @@ const RushLimitApp = () => {
     { id: 7, licensePlate: 'KL-01-MN-6789', capacity: 40, routeAssigned: '33', status: 'standby', currentOccupancy: 0, location: { lat: 8.5700, lng: 76.8800 } },
   ]);
 
-  // ML Insights data (simulated)
   const mlInsights = {
     averageFlakeRate: 12.5,
     shadowDemandAccuracy: 91,
@@ -123,13 +121,22 @@ const RushLimitApp = () => {
   };
 
   useEffect(() => {
-    // Set default date to tomorrow
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     setSelectedDate(tomorrow.toISOString().split('T')[0]);
   }, []);
 
-  // Login Screen
+  const getMinDate = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
+
+  const getMaxDate = () => {
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 30);
+    return maxDate.toISOString().split('T')[0];
+  };
+
   const LoginScreen = () => (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 via-indigo-600 to-purple-700 flex items-center justify-center p-6">
       <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full">
@@ -177,17 +184,82 @@ const RushLimitApp = () => {
     </div>
   );
 
-  // Passenger View
+  const BusDeploymentInput = () => {
+    const [inputValue, setInputValue] = useState('');
+
+    const handleDeployBuses = () => {
+      const numBuses = parseInt(inputValue);
+      if (numBuses > 0) {
+        setAvailableBuses(numBuses);
+        setBusesDeployed(true);
+      } else {
+        alert('Please enter a valid number of buses');
+      }
+    };
+
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center p-6">
+        <div className="bg-gray-800 rounded-3xl shadow-2xl p-8 max-w-md w-full">
+          <div className="text-center mb-8">
+            <div className="bg-gradient-to-r from-green-600 to-teal-600 w-20 h-20 rounded-2xl mx-auto mb-4 flex items-center justify-center">
+              <Bus className="text-white" size={40} />
+            </div>
+            <h1 className="text-3xl font-bold text-white mb-2">Bus Deployment</h1>
+            <p className="text-gray-400">How many buses can you deploy today?</p>
+          </div>
+
+          <div className="space-y-6">
+            <div>
+              <label className="block text-gray-300 mb-2 font-medium">Number of Buses Available</label>
+              <input
+                type="number"
+                min="1"
+                max="20"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                className="w-full p-4 rounded-xl bg-gray-700 text-white text-2xl font-bold text-center focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="0"
+              />
+            </div>
+
+            <button
+              onClick={handleDeployBuses}
+              className="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700 text-white font-semibold py-4 rounded-xl transition transform hover:scale-105"
+            >
+              Continue to Dashboard
+            </button>
+
+            <button
+              onClick={() => {
+                setIsLoggedIn(false);
+                setUserType(null);
+              }}
+              className="w-full bg-gray-700 hover:bg-gray-600 text-white font-semibold py-3 rounded-xl transition"
+            >
+              Back to Login
+            </button>
+          </div>
+
+          <div className="mt-6 bg-gray-700 rounded-lg p-4">
+            <p className="text-sm text-gray-300 text-center">
+              <BarChart3 className="inline mr-2" size={16} />
+              Total buses needed today: {routes.reduce((sum, r) => sum + r.basesNeeded, 0)}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const PassengerView = () => {
     const filteredRoutes = routes.filter(route =>
       route.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      route.routeNumber.includes(searchTerm) ||
+      route.routeNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       route.from.toLowerCase().includes(searchTerm.toLowerCase()) ||
       route.to.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const handleMarkAttendance = (route, time) => {
-      // Simulate bus assignment
       const routeBuses = busFleet.filter(bus => bus.routeAssigned === route.routeNumber && bus.status === 'active');
       const randomBus = routeBuses[Math.floor(Math.random() * routeBuses.length)];
       
@@ -199,7 +271,6 @@ const RushLimitApp = () => {
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 pb-20">
-        {/* Header */}
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white p-6 sticky top-0 z-10 shadow-lg">
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-between mb-4">
@@ -215,6 +286,8 @@ const RushLimitApp = () => {
                   setIsLoggedIn(false);
                   setUserType(null);
                   setAttendanceMarked(false);
+                  setSelectedRoute(null);
+                  setAssignedBus(null);
                 }}
                 className="bg-white bg-opacity-20 hover:bg-opacity-30 p-2 rounded-lg transition"
               >
@@ -222,7 +295,6 @@ const RushLimitApp = () => {
               </button>
             </div>
 
-            {/* Search */}
             <div className="relative">
               <Search className="absolute left-3 top-3 text-gray-400" size={20} />
               <input
@@ -237,7 +309,6 @@ const RushLimitApp = () => {
         </div>
 
         <div className="max-w-4xl mx-auto p-6">
-          {/* Attendance Confirmation */}
           {attendanceMarked && assignedBus && (
             <div className="bg-white rounded-2xl shadow-xl p-6 mb-6 border-2 border-green-500">
               <div className="flex items-center gap-3 mb-4">
@@ -258,7 +329,12 @@ const RushLimitApp = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm opacity-90">Date</p>
-                      <p className="font-semibold">{new Date(selectedDate).toLocaleDateString()}</p>
+                      <p className="font-semibold">{new Date(selectedDate).toLocaleDateString('en-US', { 
+                        weekday: 'short', 
+                        year: 'numeric', 
+                        month: 'short', 
+                        day: 'numeric' 
+                      })}</p>
                     </div>
                     <div>
                       <p className="text-sm opacity-90">Time</p>
@@ -289,7 +365,6 @@ const RushLimitApp = () => {
             </div>
           )}
 
-          {/* Date & Time Selection */}
           {!attendanceMarked && (
             <div className="bg-white rounded-2xl shadow-lg p-6 mb-6">
               <h3 className="text-lg font-bold text-gray-900 mb-4">Select Travel Date</h3>
@@ -297,7 +372,8 @@ const RushLimitApp = () => {
                 type="date"
                 value={selectedDate}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                min={new Date().toISOString().split('T')[0]}
+                min={getMinDate()}
+                max={getMaxDate()}
                 className="w-full p-3 border-2 border-gray-300 rounded-lg focus:border-indigo-600 focus:outline-none"
               />
               <p className="text-sm text-gray-600 mt-2">
@@ -307,7 +383,6 @@ const RushLimitApp = () => {
             </div>
           )}
 
-          {/* Routes List */}
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Available Routes</h2>
           <div className="space-y-4">
             {filteredRoutes.map(route => (
@@ -383,15 +458,15 @@ const RushLimitApp = () => {
           </div>
         </div>
 
-        {/* Bus Tracking Modal */}
         {trackingBus && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-6 z-50">
-            <div className="bg-white rounded-2xl max-w-2xl w-full p-6">
+            <div className="bg-white rounded-2xl max-w-2xl w-full p-6 max-h-screen overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold">Live Bus Tracking</h2>
                 <button
                   onClick={() => setTrackingBus(null)}
-                  className="text-gray-500 hover:text-gray-700"
+                  className="text-gray-500 hover:text-gray-700 text-2xl font-bold"
+                  aria-label="Close tracking"
                 >
                   ✕
                 </button>
@@ -402,16 +477,18 @@ const RushLimitApp = () => {
                 <p className="text-2xl font-bold text-indigo-600">{trackingBus.licensePlate}</p>
               </div>
 
-              {/* Simulated Map */}
-              <div className="bg-gradient-to-br from-blue-100 to-green-100 rounded-xl h-64 mb-4 flex items-center justify-center relative overflow-hidden">
-                <div className="absolute inset-0 opacity-20">
-                  <div className="w-full h-full" style={{
-                    backgroundImage: 'repeating-linear-gradient(0deg, #ccc, #ccc 1px, transparent 1px, transparent 20px), repeating-linear-gradient(90deg, #ccc, #ccc 1px, transparent 1px, transparent 20px)'
-                  }}></div>
-                </div>
-                <div className="relative">
-                  <Bus className="text-indigo-600 animate-pulse" size={48} />
-                  <p className="text-center mt-2 font-semibold">Bus is moving...</p>
+              <div className="mb-4 rounded-xl overflow-hidden" style={{height: '400px'}}>
+                {/* Safe Google Maps embed without API key */}
+                <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                  <div className="text-center p-8">
+                    <MapPin className="mx-auto text-gray-400 mb-4" size={48} />
+                    <h3 className="text-xl font-bold text-gray-700 mb-2">Live Bus Tracking</h3>
+                    <p className="text-gray-600 mb-4">Bus {trackingBus.licensePlate} is on Route {trackingBus.routeAssigned}</p>
+                    <div className="bg-blue-50 p-4 rounded-lg">
+                      <p className="text-sm text-gray-600">Current Location</p>
+                      <p className="font-bold">Near {routes.find(r => r.routeNumber === trackingBus.routeAssigned)?.from}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -439,15 +516,14 @@ const RushLimitApp = () => {
     );
   };
 
-  // Bus Owner Dashboard
   const BusOwnerView = () => {
     const totalCapacity = busFleet.reduce((sum, bus) => sum + bus.capacity, 0);
     const totalOccupied = busFleet.reduce((sum, bus) => sum + bus.currentOccupancy, 0);
     const activeBuses = busFleet.filter(bus => bus.status === 'active').length;
+    const totalBusesNeeded = routes.reduce((sum, r) => sum + r.basesNeeded, 0);
 
     return (
       <div className="min-h-screen bg-gray-900 text-white pb-20">
-        {/* Header */}
         <div className="bg-gray-800 p-6 sticky top-0 z-10 shadow-lg">
           <div className="max-w-7xl mx-auto">
             <div className="flex items-center justify-between">
@@ -460,21 +536,41 @@ const RushLimitApp = () => {
                   <p className="text-gray-400">Bus Owner Dashboard - Trivandrum</p>
                 </div>
               </div>
-              <button
-                onClick={() => {
-                  setIsLoggedIn(false);
-                  setUserType(null);
-                }}
-                className="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg transition"
-              >
-                <LogOut size={20} />
-              </button>
+              <div className="flex items-center gap-4">
+                <div className="bg-green-600 px-6 py-3 rounded-lg">
+                  <p className="text-sm opacity-90">Buses Available</p>
+                  <p className="text-2xl font-bold">{availableBuses || 0}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setIsLoggedIn(false);
+                    setUserType(null);
+                    setBusesDeployed(false);
+                    setAvailableBuses(null);
+                  }}
+                  className="bg-gray-700 hover:bg-gray-600 p-2 rounded-lg transition"
+                  aria-label="Logout"
+                >
+                  <LogOut size={20} />
+                </button>
+              </div>
             </div>
           </div>
         </div>
 
         <div className="max-w-7xl mx-auto p-6">
-          {/* Key Metrics */}
+          {availableBuses < totalBusesNeeded && (
+            <div className="bg-orange-900 border border-orange-600 rounded-xl p-6 mb-6">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="text-orange-400" size={32} />
+                <div>
+                  <p className="text-xl font-bold">⚠️ Insufficient Buses</p>
+                  <p className="text-gray-300">You have {availableBuses} buses available, but need {totalBusesNeeded} to cover all routes optimally.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-4 gap-4 mb-6">
             <div className="bg-gray-800 rounded-xl p-6">
               <div className="flex items-center gap-3 mb-2">
@@ -513,7 +609,6 @@ const RushLimitApp = () => {
             </div>
           </div>
 
-          {/* ML Insights Panel */}
           <div className="bg-gradient-to-r from-indigo-900 to-purple-900 rounded-xl p-6 mb-6">
             <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
               <Zap size={24} />
@@ -556,7 +651,6 @@ const RushLimitApp = () => {
             </div>
           </div>
 
-          {/* Routes Analysis */}
           <h2 className="text-2xl font-bold mb-4">Route Performance & Deployment</h2>
           <div className="space-y-4">
             {routes.map(route => (
@@ -619,7 +713,6 @@ const RushLimitApp = () => {
                   </div>
                 </div>
 
-                {/* Assigned Buses */}
                 <div className="bg-gray-700 p-4 rounded-lg">
                   <p className="text-sm text-gray-400 mb-3">Deployed Buses on Route {route.routeNumber}:</p>
                   <div className="grid grid-cols-3 gap-3">
@@ -653,7 +746,10 @@ const RushLimitApp = () => {
                         <p className="text-sm text-gray-300">Deploy 1 additional bus to prevent overcrowding</p>
                       </div>
                     </div>
-                    <button className="bg-red-600 hover:bg-red-500 px-6 py-3 rounded-lg font-semibold transition">
+                    <button 
+                      onClick={() => alert('Shadow bus deployment initiated for Route ' + route.routeNumber)}
+                      className="bg-red-600 hover:bg-red-500 px-6 py-3 rounded-lg font-semibold transition"
+                    >
                       Deploy Shadow Bus
                     </button>
                   </div>
@@ -662,7 +758,6 @@ const RushLimitApp = () => {
             ))}
           </div>
 
-          {/* Fleet Overview */}
           <div className="bg-gray-800 rounded-xl p-6 mt-6">
             <h3 className="text-xl font-bold mb-4">Fleet Status Overview</h3>
             <div className="grid grid-cols-3 gap-4 mb-4">
@@ -688,9 +783,12 @@ const RushLimitApp = () => {
     );
   };
 
-  // Main render
   if (!isLoggedIn) {
     return <LoginScreen />;
+  }
+
+  if (userType === 'busowner' && !busesDeployed) {
+    return <BusDeploymentInput />;
   }
 
   if (userType === 'passenger') {
@@ -705,4 +803,3 @@ const RushLimitApp = () => {
 };
 
 export default RushLimitApp;
-

@@ -10,7 +10,7 @@ A smart transit management system for Trivandrum city that uses ML predictions t
 - Optimized bus deployment
 
 ## Live Demo
-[Netlify Link](#)
+https://rulit.netlify.app/
 
 ## Tech Stack
 - React 18
